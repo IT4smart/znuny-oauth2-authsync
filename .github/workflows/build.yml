@@ -1,0 +1,51 @@
+name: Build OPM
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+
+jobs:
+
+  lint:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Install Perl
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: '5.36'
+
+      - name: Perl Syntax Check
+        run: |
+          find Kernel -name "*.pm" -print0 | while IFS= read -r -d '' file
+          do
+            perl -c "$file"
+          done
+
+  build:
+
+    needs: lint
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Build OPM
+        run: |
+          chmod +x build-opm.sh
+          ./build-opm.sh
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OAuth2AuthSync
+          path: build/*.opm

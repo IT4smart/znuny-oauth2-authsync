@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<otrs_package version="1.0">
+    <Name>OAuth2AuthSync</Name>
+    <Version>0.1.0</Version>
+    <Vendor>IT4smart</Vendor>
+    <URL>
+        https://github.com/IT4smart/znuny-oauth2-authsync
+    </URL>
+    <License>Apache-2.0</License>
+    <Framework Minimum="7.3.0" Maximum="7.3.999" />
+    <Description Lang="en">
+        OAuth2 Proxy based user provisioning and group sync.
+    </Description>
+    <Filelist>
+        <File
+            Location="Kernel/System/Auth/OAuth2AuthSync.pm"
+            Permission="644" />
+        <File
+            Location="Kernel/Config/Files/XML/OAuth2AuthSync.xml"
+            Permission="644" />
+    </Filelist>
+</otrs_package>

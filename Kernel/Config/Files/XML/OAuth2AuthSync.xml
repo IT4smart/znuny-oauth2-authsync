@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<otrs_config version="2.0">
+
+    <ConfigItem Name="AuthModule" Required="1" Valid="1">
+        <Group>Framework</Group>
+        <SubGroup>Core</SubGroup>
+        <Setting>
+            <String>Kernel::System::Auth::OAuth2AuthSync</String>
+        </Setting>
+    </ConfigItem>
+
+    <ConfigItem Name="OAuth2AuthSync::ProtectedUsers"
+        Required="0"
+        Valid="1">
+
+        <Group>Auth</Group>
+        <SubGroup>OAuth2AuthSync</SubGroup>
+
+        <Setting>
+            <Array>
+                <Item>root@localhost</Item>
+            </Array>
+        </Setting>
+    </ConfigItem>
+
+    <ConfigItem Name="OAuth2AuthSync::GroupMapping"
+        Required="0"
+        Valid="1">
+
+        <Group>Auth</Group>
+        <SubGroup>OAuth2AuthSync</SubGroup>
+
+        <Setting>
+            <Hash>
+                <Item Key="6230639a-6566-4074-825b-6d05fd7ad1bc">
+                    users
+                </Item>
+
+                <Item Key="6e69370d-87df-40b3-9b2f-809eb4a8d53d">
+                    admin
+                </Item>
+            </Hash>
+        </Setting>
+
+    </ConfigItem>
+
+</otrs_config>
