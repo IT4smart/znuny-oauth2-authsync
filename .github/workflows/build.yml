@@ -43,10 +43,12 @@ jobs:
 
       - name: Build OPM
         run: |
+          pwd
+          id
           cp Kernel/Config.pm.dist Kernel/Config.pm
           su znuny
           cd /opt/znuny
-          bin/znuny.Console.pl Dev::Package::Build ./OAuth2AuthSync.sopm /tmp
+          bin/znuny.Console.pl Dev::Package::Build ${{ github.workspace }}/OAuth2AuthSync.sopm /tmp
 
 
       - uses: actions/upload-artifact@v7.0.1
