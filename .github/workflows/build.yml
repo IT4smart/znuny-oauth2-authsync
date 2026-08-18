@@ -43,6 +43,9 @@ jobs:
 
       - name: Build OPM
         run: |
+          pwd
+          ls -l 
+          ls -l ${{ github.workspace }}
           cp /opt/znuny/Kernel/Config.pm.dist /opt/znuny/Kernel/Config.pm
           su -c "/opt/znuny/bin/znuny.Console.pl Dev::Package::Build ${{ github.workspace }}/OAuth2AuthSync.sopm /tmp" -s /bin/bash znuny
 
