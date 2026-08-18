@@ -36,20 +36,23 @@ jobs:
     needs: lint
 
     runs-on: ubuntu-latest
-
+    container:
+      image: ghcr.io/znuny/znuny-docker/znuny-base:7.3.5
     steps:
-
       - uses: actions/checkout@v4
 
       - name: Build OPM
         run: |
-          chmod +x build-opm.sh
-          ./build-opm.sh
+          cp Kernel/Config.pm.dist Kernel/Config.pm
+          su znuny
+          cd /opt/znuny
+          bin/znuny.Console.pl Dev::Package::Build ./OAuth2AuthSync.sopm /tmp
+
 
       - uses: actions/upload-artifact@v7.0.1
         with:
           name: OAuth2AuthSync
-          path: build/*.opm
+          path: /tmp/*.opm
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
