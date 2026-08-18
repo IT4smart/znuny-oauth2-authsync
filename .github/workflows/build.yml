@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+    tags:
+      - 'v*'
+
   pull_request:
 
 jobs:
@@ -17,16 +20,15 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      - name: Install Perl
-        uses: shogo82148/actions-setup-perl@v1
+      - uses: shogo82148/actions-setup-perl@v1
         with:
           perl-version: '5.36'
 
-      - name: Perl Syntax Check
+      - name: Perl Lint
         run: |
-          find Kernel -name "*.pm" -print0 | while IFS= read -r -d '' file
+          find Kernel -type f -name "*.pm" | while read FILE
           do
-            perl -c "$file"
+            perl -c "$FILE"
           done
 
   build:
@@ -44,8 +46,25 @@ jobs:
           chmod +x build-opm.sh
           ./build-opm.sh
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.1
         with:
           name: OAuth2AuthSync
           path: build/*.opm
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Package Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: OAuth2AuthSync
+          path: release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*.zip
