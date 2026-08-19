@@ -3,6 +3,9 @@ package Kernel::System::AuthSync::OAuth2AuthSync;
 use strict;
 use warnings;
 
+use MIME::Base64 qw(decode_base64url);
+use JSON qw(decode_json);
+
 our @ObjectDependencies = (
     'Kernel::Config',
     'Kernel::System::User',
@@ -19,16 +22,50 @@ sub new {
     return $Self;
 }
 
-sub _ReadHeader {
-    my ( $Self, $Headers ) = @_;
+sub _ReadAccessToken {
+    my ( $Self ) = @_;
 
-    HEADER:
-    for my $Header ( @{$Headers} ) {
+    my $Token = $ENV{HTTP_X_ACCESS_TOKEN};
 
-        next HEADER if !$ENV{$Header};
+    return if !$Token;
 
-        return $ENV{$Header};
-    }
+    my @Parts = split /\./, $Token;
+
+    return if scalar(@Parts) < 2;
+
+    my $Payload;
+
+    eval {
+        $Payload = decode_base64url( $Parts[1] );
+    };
+
+    return if !$Payload;
+
+    my $Claims;
+
+    eval {
+        $Claims = decode_json($Payload);
+    };
+
+    return if !$Claims;
+
+    return $Claims;
+}
+
+sub _GetUserLogin {
+    my ( $Self, $Claims ) = @_;
+
+    return $ENV{REMOTE_USER}
+        if $ENV{REMOTE_USER};
+
+    return $ENV{HTTP_X_REMOTE_EMAIL}
+        if $ENV{HTTP_X_REMOTE_EMAIL};
+
+    return $Claims->{preferred_username}
+        if $Claims && $Claims->{preferred_username};
+
+    return $Claims->{email}
+        if $Claims && $Claims->{email};
 
     return;
 }
@@ -41,39 +78,48 @@ sub Sync {
     my $GroupObject  = $Kernel::OM->Get('Kernel::System::Group');
     my $LogObject    = $Kernel::OM->Get('Kernel::System::Log');
 
-    my $UserLogin = $Param{User};
+    my $Claims = $Self->_ReadAccessToken();
 
-    my @LoginHeaders =
-        @{ $ConfigObject->Get('OAuth2AuthSync::Headers::Login') || [] };
-
-    if ( !$UserLogin ) {
-        $UserLogin = $Self->_ReadHeader( \@LoginHeaders );
-    }
+    my $UserLogin =
+           $Param{User}
+        || $Self->_GetUserLogin($Claims);
 
     return if !$UserLogin;
 
-    my %Protected = map { $_ => 1 }
+    my %ProtectedUsers = map { $_ => 1 }
         @{ $ConfigObject->Get('OAuth2AuthSync::ProtectedUsers') || [] };
 
-    return 1 if $Protected{$UserLogin};
+    if ( $ProtectedUsers{$UserLogin} ) {
 
-    my $Email = $Self->_ReadHeader(
-        $ConfigObject->Get('OAuth2AuthSync::Headers::Email') || []
-    );
+        $LogObject->Log(
+            Priority => 'notice',
+            Message  => "OAuth2AuthSync skipped protected user <$UserLogin>",
+        );
 
-    my $FirstName = $Self->_ReadHeader(
-        $ConfigObject->Get('OAuth2AuthSync::Headers::GivenName') || []
-    );
+        return 1;
+    }
 
-    my $LastName = $Self->_ReadHeader(
-        $ConfigObject->Get('OAuth2AuthSync::Headers::Surname') || []
-    );
+    my $Email =
+           $ENV{HTTP_X_REMOTE_EMAIL}
+        || ($Claims && $Claims->{email})
+        || $UserLogin;
 
-    my $DisplayName = $Self->_ReadHeader(
-        $ConfigObject->Get('OAuth2AuthSync::Headers::DisplayName') || []
-    );
+    my $FirstName =
+           $ENV{HTTP_X_REMOTE_GIVEN_NAME}
+        || ($Claims && $Claims->{given_name})
+        || '';
 
-    if ( !$FirstName && $DisplayName ) {
+    my $LastName =
+           $ENV{HTTP_X_REMOTE_FAMILY_NAME}
+        || ($Claims && $Claims->{family_name})
+        || '';
+
+    my $DisplayName =
+           $ENV{HTTP_X_REMOTE_NAME}
+        || ($Claims && $Claims->{name})
+        || '';
+
+    if ( !$FirstName && !$LastName && $DisplayName ) {
 
         if ( $DisplayName =~ /^(.+?)\s+(.+)$/ ) {
             $FirstName = $1;
@@ -81,13 +127,16 @@ sub Sync {
         }
     }
 
-    $Email ||= $UserLogin;
-
     my $UserID = $UserObject->UserLookup(
         UserLogin => $UserLogin,
     );
 
-    if (!$UserID) {
+    if ( !$UserID ) {
+
+        $LogObject->Log(
+            Priority => 'notice',
+            Message  => "OAuth2AuthSync creating <$UserLogin>",
+        );
 
         $UserID = $UserObject->UserAdd(
             UserLogin     => $UserLogin,
@@ -95,12 +144,7 @@ sub Sync {
             UserLastname  => $LastName  || 'User',
             UserEmail     => $Email,
             ValidID       => 1,
-            ChangeUserID  => 1,
-        );
-
-        $LogObject->Log(
-            Priority => 'notice',
-            Message  => "OAuth2AuthSync created user $UserLogin",
+            UserID        => 1,
         );
     }
 
@@ -116,36 +160,89 @@ sub Sync {
         ChangeUserID  => 1,
     );
 
-    my $GroupsHeader = $Self->_ReadHeader(
-        $ConfigObject->Get('OAuth2AuthSync::Headers::Groups') || []
-    );
+    #
+    # User Preferences
+    #
+    if ($Claims) {
 
-    return 1 if !$GroupsHeader;
+        if ( $Claims->{oid} ) {
 
-    my %Mapping =
-        %{ $ConfigObject->Get('OAuth2AuthSync::GroupMapping') || {} };
+            $UserObject->SetPreferences(
+                UserID => $UserID,
+                Key    => 'OAuth2OID',
+                Value  => $Claims->{oid},
+            );
+        }
 
-    my @Groups = split /\s*,\s*/, $GroupsHeader;
+        if ( $Claims->{tid} ) {
 
-    GROUP:
-    for my $EntraGroup (@Groups) {
+            $UserObject->SetPreferences(
+                UserID => $UserID,
+                Key    => 'OAuth2TenantID',
+                Value  => $Claims->{tid},
+            );
+        }
 
-        my $ZnunyGroup = $Mapping{$EntraGroup};
+        if ( $Claims->{preferred_username} ) {
 
-        next GROUP if !$ZnunyGroup;
+            $UserObject->SetPreferences(
+                UserID => $UserID,
+                Key    => 'OAuth2PreferredUsername',
+                Value  => $Claims->{preferred_username},
+            );
+        }
+    }
 
-        my $GroupID = $GroupObject->GroupLookup(
-            Group => $ZnunyGroup,
-        );
+    #
+    # Group Synchronization
+    #
+    my @EntraGroups;
 
-        next GROUP if !$GroupID;
+    if ( $ENV{HTTP_X_REMOTE_GROUPS} ) {
 
-        $GroupObject->PermissionGroupUserAdd(
-            UID           => $UserID,
-            GID           => $GroupID,
-            PermissionKey => 'rw',
-            UserID        => 1,
-        );
+        @EntraGroups =
+            split /\s*,\s*/, $ENV{HTTP_X_REMOTE_GROUPS};
+    }
+    elsif (
+        $Claims
+        && $Claims->{groups}
+        && ref $Claims->{groups} eq 'ARRAY'
+        )
+    {
+        @EntraGroups = @{ $Claims->{groups} };
+    }
+
+    if (@EntraGroups) {
+
+        my %GroupMapping =
+            %{ $ConfigObject->Get('OAuth2AuthSync::GroupMapping') || {} };
+
+        GROUP:
+        for my $EntraGroup (@EntraGroups) {
+
+            my $ZnunyGroup =
+                $GroupMapping{$EntraGroup};
+
+            next GROUP if !$ZnunyGroup;
+
+            my $GroupID = $GroupObject->GroupLookup(
+                Group => $ZnunyGroup,
+            );
+
+            next GROUP if !$GroupID;
+
+            $GroupObject->PermissionGroupUserAdd(
+                UID           => $UserID,
+                GID           => $GroupID,
+                PermissionKey => 'rw',
+                UserID        => 1,
+            );
+
+            $LogObject->Log(
+                Priority => 'notice',
+                Message  => "OAuth2AuthSync mapped <$UserLogin> to <$ZnunyGroup>",
+            );
+        }
     }
 
     return 1;

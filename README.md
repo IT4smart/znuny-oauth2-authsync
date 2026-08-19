@@ -4,7 +4,7 @@ A module to sync user from OAuth2
 ## Example
 Example configuration in Config.pm:
 ```
-# OAuth2 Auth Modul
+# OAuth2 AuthSync Modul
 
 $Self->{'AuthSyncModule'} = 'Kernel::System::AuthSync::OAuth2AuthSync';
 
