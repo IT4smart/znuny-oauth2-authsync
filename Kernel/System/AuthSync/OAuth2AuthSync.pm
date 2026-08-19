@@ -144,7 +144,7 @@ sub Sync {
             UserLastname  => $LastName  || 'User',
             UserEmail     => $Email,
             ValidID       => 1,
-            UserID        => 1,
+            ChangeUserID  => 1,
         );
     }
 
@@ -235,7 +235,7 @@ sub Sync {
                 UID           => $UserID,
                 GID           => $GroupID,
                 PermissionKey => 'rw',
-                UserID        => 1,
+                ChangeUserID  => 1,
             );
 
             $LogObject->Log(

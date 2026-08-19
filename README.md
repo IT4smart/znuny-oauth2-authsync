@@ -28,3 +28,17 @@ $Self->{'OAuth2AuthSync::GroupMapping'} = {
 
 };
 ```
+
+## Example Nginx
+Example header configuration in Nginx
+```
+auth_request_set $user $upstream_http_x_auth_request_user;
+auth_request_set $email $upstream_http_x_auth_request_email;
+auth_request_set $groups $upstream_http_x_auth_request_groups;
+auth_request_set $access_token $upstream_http_x_auth_request_access_token;
+
+proxy_set_header X-Remote-User $user;
+proxy_set_header X-Remote-Email $email;
+proxy_set_header X-Remote-Groups $groups;
+proxy_set_header X-Access-Token $access_token;
+```
