@@ -6,8 +6,7 @@ Example configuration in Config.pm:
 ```
 # OAuth2 Auth Modul
 
-$Self->{'AuthModule'} =
-    'Kernel::System::Auth::OAuth2AuthSync';
+$Self->{'AuthSyncModule'} = 'Kernel::System::AuthSync::OAuth2AuthSync';
 
 # root@localhost niemals überschreiben
 
