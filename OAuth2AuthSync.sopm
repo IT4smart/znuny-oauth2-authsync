@@ -3,7 +3,7 @@
     <Name>OAuth2AuthSync</Name>
     <Version>0.1.0</Version>
     <Framework>7.3.x</Framework>
-    <Vendor>IT4smart</Vendor>
+    <Vendor>IT4smart GmbH</Vendor>
     <URL>https://github.com/IT4smart/znuny-oauth2-authsync</URL>
     <License>Apache-2.0</License>
     <Description Lang="en">

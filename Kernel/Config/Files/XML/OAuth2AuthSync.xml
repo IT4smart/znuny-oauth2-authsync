@@ -1,47 +1,139 @@
-<?xml version="1.0" encoding="utf-8"?>
-<otrs_config version="2.0">
+<?xml version="1.0" encoding="utf-8" ?>
+<otrs_config version="2.0" init="Framework">
 
-    <ConfigItem Name="AuthModule" Required="1" Valid="1">
-        <Group>Framework</Group>
-        <SubGroup>Core</SubGroup>
-        <Setting>
-            <String>Kernel::System::Auth::OAuth2AuthSync</String>
-        </Setting>
-    </ConfigItem>
+    <Setting Name="OAuth2AuthSync::ProtectedUsers"
+             Required="0"
+             Valid="1">
 
-    <ConfigItem Name="OAuth2AuthSync::ProtectedUsers"
-        Required="0"
-        Valid="1">
+        <Description Translatable="1">
+            Users that are excluded from synchronization.
+        </Description>
 
-        <Group>Auth</Group>
-        <SubGroup>OAuth2AuthSync</SubGroup>
+        <Navigation>Auth::OAuth2AuthSync</Navigation>
 
-        <Setting>
+        <Value>
             <Array>
                 <Item>root@localhost</Item>
             </Array>
-        </Setting>
-    </ConfigItem>
+        </Value>
 
-    <ConfigItem Name="OAuth2AuthSync::GroupMapping"
-        Required="0"
-        Valid="1">
+    </Setting>
 
-        <Group>Auth</Group>
-        <SubGroup>OAuth2AuthSync</SubGroup>
+    <Setting Name="OAuth2AuthSync::Headers::Login"
+             Required="1"
+             Valid="1">
 
-        <Setting>
-            <Hash>
-                <Item Key="6230639a-6566-4074-825b-6d05fd7ad1bc">
-                    users
-                </Item>
+        <Description Translatable="1">
+            Ordered list of HTTP headers used to determine the user login.
+        </Description>
 
-                <Item Key="6e69370d-87df-40b3-9b2f-809eb4a8d53d">
-                    admin
-                </Item>
-            </Hash>
-        </Setting>
+        <Navigation>Auth::OAuth2AuthSync</Navigation>
 
-    </ConfigItem>
+        <Value>
+            <Array>
+                <Item>REMOTE_USER</Item>
+                <Item>HTTP_X_REMOTE_USER</Item>
+                <Item>HTTP_X_REMOTE_EMAIL</Item>
+                <Item>HTTP_X_AUTH_REQUEST_EMAIL</Item>
+            </Array>
+        </Value>
+
+    </Setting>
+
+    <Setting Name="OAuth2AuthSync::Headers::Email"
+             Required="1"
+             Valid="1">
+
+        <Description Translatable="1">
+            Ordered list of HTTP headers used to determine the user email.
+        </Description>
+
+        <Navigation>Auth::OAuth2AuthSync</Navigation>
+
+        <Value>
+            <Array>
+                <Item>HTTP_X_REMOTE_EMAIL</Item>
+                <Item>HTTP_X_AUTH_REQUEST_EMAIL</Item>
+                <Item>HTTP_X_FORWARDED_EMAIL</Item>
+            </Array>
+        </Value>
+
+    </Setting>
+
+    <Setting Name="OAuth2AuthSync::Headers::GivenName"
+             Required="0"
+             Valid="1">
+
+        <Navigation>Auth::OAuth2AuthSync</Navigation>
+
+        <Value>
+            <Array>
+                <Item>HTTP_X_REMOTE_GIVEN_NAME</Item>
+                <Item>HTTP_X_AUTH_REQUEST_GIVEN_NAME</Item>
+            </Array>
+        </Value>
+
+    </Setting>
+
+    <Setting Name="OAuth2AuthSync::Headers::Surname"
+             Required="0"
+             Valid="1">
+
+        <Navigation>Auth::OAuth2AuthSync</Navigation>
+
+        <Value>
+            <Array>
+                <Item>HTTP_X_REMOTE_FAMILY_NAME</Item>
+                <Item>HTTP_X_AUTH_REQUEST_FAMILY_NAME</Item>
+            </Array>
+        </Value>
+
+    </Setting>
+
+    <Setting Name="OAuth2AuthSync::Headers::DisplayName"
+             Required="0"
+             Valid="1">
+
+        <Navigation>Auth::OAuth2AuthSync</Navigation>
+
+        <Value>
+            <Array>
+                <Item>HTTP_X_REMOTE_NAME</Item>
+                <Item>HTTP_X_AUTH_REQUEST_NAME</Item>
+            </Array>
+        </Value>
+
+    </Setting>
+
+    <Setting Name="OAuth2AuthSync::Headers::Groups"
+             Required="0"
+             Valid="1">
+
+        <Navigation>Auth::OAuth2AuthSync</Navigation>
+
+        <Value>
+            <Array>
+                <Item>HTTP_X_REMOTE_GROUPS</Item>
+                <Item>HTTP_X_AUTH_REQUEST_GROUPS</Item>
+            </Array>
+        </Value>
+
+    </Setting>
+
+    <Setting Name="OAuth2AuthSync::GroupMapping"
+             Required="0"
+             Valid="1">
+
+        <Description Translatable="1">
+            Mapping of Entra ID Group Object IDs to Znuny Groups.
+        </Description>
+
+        <Navigation>Auth::OAuth2AuthSync</Navigation>
+
+        <Value>
+            <Hash />
+        </Value>
+
+    </Setting>
 
 </otrs_config>

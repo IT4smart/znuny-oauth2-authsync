@@ -19,49 +19,69 @@ sub new {
     return $Self;
 }
 
+sub _ReadHeader {
+    my ( $Self, $Headers ) = @_;
+
+    HEADER:
+    for my $Header ( @{$Headers} ) {
+
+        next HEADER if !$ENV{$Header};
+
+        return $ENV{$Header};
+    }
+
+    return;
+}
+
 sub Sync {
     my ( $Self, %Param ) = @_;
-
-    my $UserLogin = $Param{User};
-
-    return if !$UserLogin;
 
     my $ConfigObject = $Kernel::OM->Get('Kernel::Config');
     my $UserObject   = $Kernel::OM->Get('Kernel::System::User');
     my $GroupObject  = $Kernel::OM->Get('Kernel::System::Group');
     my $LogObject    = $Kernel::OM->Get('Kernel::System::Log');
 
-    my @ProtectedUsers =
-        @{ $ConfigObject->Get('OAuth2AuthSync::ProtectedUsers') || [] };
+    my $UserLogin = $Param{User};
 
-    my %Protected = map { $_ => 1 } @ProtectedUsers;
+    my @LoginHeaders =
+        @{ $ConfigObject->Get('OAuth2AuthSync::Headers::Login') || [] };
+
+    if ( !$UserLogin ) {
+        $UserLogin = $Self->_ReadHeader( \@LoginHeaders );
+    }
+
+    return if !$UserLogin;
+
+    my %Protected = map { $_ => 1 }
+        @{ $ConfigObject->Get('OAuth2AuthSync::ProtectedUsers') || [] };
 
     return 1 if $Protected{$UserLogin};
 
-    my $Email =
-           $ENV{HTTP_X_REMOTE_EMAIL}
-        || $ENV{HTTP_X_AUTH_REQUEST_EMAIL}
-        || $UserLogin;
+    my $Email = $Self->_ReadHeader(
+        $ConfigObject->Get('OAuth2AuthSync::Headers::Email') || []
+    );
 
-    my $FirstName =
-           $ENV{HTTP_X_REMOTE_GIVEN_NAME}
-        || $ENV{HTTP_X_AUTH_REQUEST_GIVEN_NAME}
-        || '';
+    my $FirstName = $Self->_ReadHeader(
+        $ConfigObject->Get('OAuth2AuthSync::Headers::GivenName') || []
+    );
 
-    my $LastName =
-           $ENV{HTTP_X_REMOTE_FAMILY_NAME}
-        || $ENV{HTTP_X_AUTH_REQUEST_FAMILY_NAME}
-        || '';
+    my $LastName = $Self->_ReadHeader(
+        $ConfigObject->Get('OAuth2AuthSync::Headers::Surname') || []
+    );
 
-    my $DisplayName =
-           $ENV{HTTP_X_REMOTE_NAME}
-        || $ENV{HTTP_X_AUTH_REQUEST_NAME}
-        || '';
+    my $DisplayName = $Self->_ReadHeader(
+        $ConfigObject->Get('OAuth2AuthSync::Headers::DisplayName') || []
+    );
 
-    if ( !$FirstName && $DisplayName =~ /^(.+?)\s+(.+)$/ ) {
-        $FirstName = $1;
-        $LastName  = $2;
+    if ( !$FirstName && $DisplayName ) {
+
+        if ( $DisplayName =~ /^(.+?)\s+(.+)$/ ) {
+            $FirstName = $1;
+            $LastName  = $2;
+        }
     }
+
+    $Email ||= $UserLogin;
 
     my $UserID = $UserObject->UserLookup(
         UserLogin => $UserLogin,
@@ -80,14 +100,15 @@ sub Sync {
 
         $LogObject->Log(
             Priority => 'notice',
-            Message  => "OAuth2AuthSync created user <$UserLogin>",
+            Message  => "OAuth2AuthSync created user $UserLogin",
         );
-
-        return if !$UserID;
     }
+
+    return if !$UserID;
 
     $UserObject->UserUpdate(
         UserID        => $UserID,
+        UserLogin     => $UserLogin,
         UserFirstname => $FirstName,
         UserLastname  => $LastName,
         UserEmail     => $Email,
@@ -95,25 +116,21 @@ sub Sync {
         ChangeUserID  => 1,
     );
 
-    my $GroupsHeader =
-           $ENV{HTTP_X_REMOTE_GROUPS}
-        || $ENV{HTTP_X_AUTH_REQUEST_GROUPS}
-        || $ENV{HTTP_X_FORWARDED_GROUPS}
-        || '';
-
-    my %GroupMapping =
-        %{ $ConfigObject->Get('OAuth2AuthSync::GroupMapping') || {} };
+    my $GroupsHeader = $Self->_ReadHeader(
+        $ConfigObject->Get('OAuth2AuthSync::Headers::Groups') || []
+    );
 
     return 1 if !$GroupsHeader;
 
-    my @EntraGroups = split /\s*,\s*/, $GroupsHeader;
+    my %Mapping =
+        %{ $ConfigObject->Get('OAuth2AuthSync::GroupMapping') || {} };
 
-    my %WantedGroups;
+    my @Groups = split /\s*,\s*/, $GroupsHeader;
 
     GROUP:
-    for my $EntraGroup (@EntraGroups) {
+    for my $EntraGroup (@Groups) {
 
-        my $ZnunyGroup = $GroupMapping{$EntraGroup};
+        my $ZnunyGroup = $Mapping{$EntraGroup};
 
         next GROUP if !$ZnunyGroup;
 
@@ -122,11 +139,6 @@ sub Sync {
         );
 
         next GROUP if !$GroupID;
-
-        $WantedGroups{$GroupID} = 1;
-    }
-
-    for my $GroupID ( keys %WantedGroups ) {
 
         $GroupObject->PermissionGroupUserAdd(
             UID           => $UserID,
