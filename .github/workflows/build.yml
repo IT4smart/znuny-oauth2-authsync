@@ -44,6 +44,7 @@ jobs:
       - name: Build OPM
         run: |
           cp /opt/znuny/Kernel/Config.pm.dist /opt/znuny/Kernel/Config.pm
+          mkdir /opt/znuny/Kernel/System/AuthSync
           cp ${GITHUB_WORKSPACE}/Kernel/System/AuthSync/OAuth2AuthSync.pm /opt/znuny/Kernel/System/AuthSync/OAuth2AuthSync.pm
           cp ${GITHUB_WORKSPACE}/Kernel/Config/Files/XML/OAuth2AuthSync.xml /opt/znuny/Kernel/Config/Files/XML/OAuth2AuthSync.xml
           su -c "/opt/znuny/bin/znuny.Console.pl Dev::Package::Build ${GITHUB_WORKSPACE}/OAuth2AuthSync.sopm /tmp" -s /bin/bash znuny
