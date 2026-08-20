@@ -62,10 +62,12 @@ sub _DetermineLogin {
         if $ENV{HTTP_X_REMOTE_EMAIL};
 
     return $Claims->{preferred_username}
-        if $Claims && $Claims->{preferred_username};
+        if $Claims
+        && $Claims->{preferred_username};
 
     return $Claims->{email}
-        if $Claims && $Claims->{email};
+        if $Claims
+        && $Claims->{email};
 
     return;
 }
@@ -88,7 +90,7 @@ sub Sync {
 
     $LogObject->Log(
         Priority => 'notice',
-        Message  => "OAuth2AuthSync: Processing <$UserLogin>",
+        Message  => "OAuth2AuthSync: UserLogin <$UserLogin>",
     );
 
     my %ProtectedUsers = map { $_ => 1 }
@@ -98,7 +100,8 @@ sub Sync {
 
         $LogObject->Log(
             Priority => 'notice',
-            Message  => "OAuth2AuthSync: Protected user <$UserLogin>, skipping sync",
+            Message =>
+                "OAuth2AuthSync: User <$UserLogin> is protected",
         );
 
         return 1;
@@ -140,7 +143,7 @@ sub Sync {
 
         $LogObject->Log(
             Priority => 'notice',
-            Message  => "OAuth2AuthSync: Creating user <$UserLogin>",
+            Message  => "OAuth2AuthSync: Creating <$UserLogin>",
         );
 
         $UserID = $UserObject->UserAdd(
@@ -156,7 +159,7 @@ sub Sync {
 
             $LogObject->Log(
                 Priority => 'error',
-                Message  => "OAuth2AuthSync: UserAdd failed for <$UserLogin>",
+                Message  => "OAuth2AuthSync: User creation failed",
             );
 
             return;
@@ -173,36 +176,14 @@ sub Sync {
         ChangeUserID  => 1,
     );
 
-    $LogObject->Log(
-        Priority => 'notice',
-        Message  => "OAuth2AuthSync: User <$UserLogin> synced (UserID=$UserID)",
-    );
+    #
+    # Read Group Mapping
+    #
+    my $GroupMapping =
+        $ConfigObject->Get('OAuth2AuthSync::GroupMapping') || {};
 
     #
-    # Store useful claims as preferences
-    #
-    if ($Claims) {
-
-        for my $Key (
-            qw(
-            oid
-            tid
-            preferred_username
-            )
-            )
-        {
-            next if !$Claims->{$Key};
-
-            $UserObject->SetPreferences(
-                UserID => $UserID,
-                Key    => "OAuth2_$Key",
-                Value  => $Claims->{$Key},
-            );
-        }
-    }
-
-    #
-    # Read groups
+    # Read Groups from Header or JWT
     #
     my @EntraGroups;
 
@@ -214,12 +195,11 @@ sub Sync {
         $LogObject->Log(
             Priority => 'notice',
             Message =>
-                "OAuth2AuthSync: Groups from header <$ENV{HTTP_X_REMOTE_GROUPS}>",
+                "OAuth2AuthSync: Groups Header <$ENV{HTTP_X_REMOTE_GROUPS}>",
         );
     }
     elsif (
         $Claims
-        && $Claims->{groups}
         && ref $Claims->{groups} eq 'ARRAY'
         )
     {
@@ -228,7 +208,8 @@ sub Sync {
 
         $LogObject->Log(
             Priority => 'notice',
-            Message  => "OAuth2AuthSync: Groups loaded from JWT",
+            Message =>
+                "OAuth2AuthSync: Using groups from JWT",
         );
     }
 
@@ -236,14 +217,12 @@ sub Sync {
 
         $LogObject->Log(
             Priority => 'notice',
-            Message  => "OAuth2AuthSync: No groups found",
+            Message =>
+                "OAuth2AuthSync: No Entra groups received",
         );
 
         return 1;
     }
-
-    my $GroupMapping =
-        $ConfigObject->Get('OAuth2AuthSync::GroupMapping') || {};
 
     GROUP:
     for my $EntraGroup (@EntraGroups) {
@@ -252,7 +231,8 @@ sub Sync {
 
         $LogObject->Log(
             Priority => 'notice',
-            Message  => "OAuth2AuthSync: Entra Group <$EntraGroup>",
+            Message =>
+                "OAuth2AuthSync: EntraGroup <$EntraGroup>",
         );
 
         next GROUP if !$Mapped;
@@ -266,12 +246,11 @@ sub Sync {
             @ZnunyGroups = ($Mapped);
         }
 
-        ZNUNYGROUP:
         for my $ZnunyGroup (@ZnunyGroups) {
 
             $LogObject->Log(
                 Priority => 'notice',
-                Message  =>
+                Message =>
                     "OAuth2AuthSync: Mapping <$EntraGroup> -> <$ZnunyGroup>",
             );
 
@@ -284,11 +263,17 @@ sub Sync {
                 $LogObject->Log(
                     Priority => 'error',
                     Message =>
-                        "OAuth2AuthSync: Group <$ZnunyGroup> not found",
+                        "OAuth2AuthSync: GroupLookup failed for <$ZnunyGroup>",
                 );
 
-                next ZNUNYGROUP;
+                next;
             }
+
+            $LogObject->Log(
+                Priority => 'notice',
+                Message =>
+                    "OAuth2AuthSync: Found GroupID <$GroupID>",
+            );
 
             my $Success =
                 $GroupObject->PermissionGroupUserAdd(
@@ -301,10 +286,10 @@ sub Sync {
             $LogObject->Log(
                 Priority => 'notice',
                 Message =>
-                    "OAuth2AuthSync: Add user <$UserID> "
-                  . "to group <$ZnunyGroup> "
-                  . "(GroupID=$GroupID) "
-                  . "Result="
+                    "OAuth2AuthSync: PermissionGroupUserAdd "
+                  . "UID=$UserID "
+                  . "GID=$GroupID "
+                  . "RESULT="
                   . ( defined $Success ? $Success : 'undef' ),
             );
         }
