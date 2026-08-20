@@ -11,6 +11,7 @@ our @ObjectDependencies = (
     'Kernel::System::User',
     'Kernel::System::Group',
     'Kernel::System::Log',
+    'Kernel::System::DB',
 );
 
 sub new {
@@ -62,14 +63,81 @@ sub _DetermineLogin {
         if $ENV{HTTP_X_REMOTE_EMAIL};
 
     return $Claims->{preferred_username}
-        if $Claims
-        && $Claims->{preferred_username};
+        if $Claims && $Claims->{preferred_username};
 
     return $Claims->{email}
-        if $Claims
-        && $Claims->{email};
+        if $Claims && $Claims->{email};
 
     return;
+}
+
+sub _GroupExists {
+    my ( $Self, %Param ) = @_;
+
+    my $DBObject = $Kernel::OM->Get('Kernel::System::DB');
+
+    my $Exists;
+
+    return if !$DBObject->Prepare(
+        SQL => '
+            SELECT id
+            FROM group_user
+            WHERE user_id = ?
+            AND group_id = ?
+            AND permission_key = ?
+        ',
+        Bind => [
+            \$Param{UserID},
+            \$Param{GroupID},
+            \$Param{PermissionKey},
+        ],
+    );
+
+    while ( my @Row = $DBObject->FetchrowArray() ) {
+        $Exists = $Row[0];
+    }
+
+    return $Exists;
+}
+
+sub _GroupAdd {
+    my ( $Self, %Param ) = @_;
+
+    my $DBObject = $Kernel::OM->Get('Kernel::System::DB');
+
+    return if $Self->_GroupExists(
+        UserID       => $Param{UserID},
+        GroupID      => $Param{GroupID},
+        PermissionKey => 'rw',
+    );
+
+    return $DBObject->Do(
+        SQL => '
+            INSERT INTO group_user
+            (
+                user_id,
+                group_id,
+                permission_key,
+                create_time,
+                create_by,
+                change_time,
+                change_by
+            )
+            VALUES
+            (
+                ?, ?, ?,
+                current_timestamp,
+                1,
+                current_timestamp,
+                1
+            )
+        ',
+        Bind => [
+            \$Param{UserID},
+            \$Param{GroupID},
+            \'rw',
+        ],
+    );
 }
 
 sub Sync {
@@ -83,14 +151,14 @@ sub Sync {
     my $Claims = $Self->_ReadAccessToken();
 
     my $UserLogin =
-        $Param{User}
+           $Param{User}
         || $Self->_DetermineLogin($Claims);
 
-    return if !$UserLogin;
+    return 1 if !$UserLogin;
 
     $LogObject->Log(
         Priority => 'notice',
-        Message  => "OAuth2AuthSync: UserLogin <$UserLogin>",
+        Message  => "OAuth2AuthSync: Processing <$UserLogin>",
     );
 
     my %ProtectedUsers = map { $_ => 1 }
@@ -100,8 +168,7 @@ sub Sync {
 
         $LogObject->Log(
             Priority => 'notice',
-            Message =>
-                "OAuth2AuthSync: User <$UserLogin> is protected",
+            Message  => "OAuth2AuthSync: Protected user <$UserLogin>",
         );
 
         return 1;
@@ -143,7 +210,7 @@ sub Sync {
 
         $LogObject->Log(
             Priority => 'notice',
-            Message  => "OAuth2AuthSync: Creating <$UserLogin>",
+            Message  => "OAuth2AuthSync: Creating user <$UserLogin>",
         );
 
         $UserID = $UserObject->UserAdd(
@@ -176,15 +243,12 @@ sub Sync {
         ChangeUserID  => 1,
     );
 
-    #
-    # Read Group Mapping
-    #
-    my $GroupMapping =
-        $ConfigObject->Get('OAuth2AuthSync::GroupMapping') || {};
+    $LogObject->Log(
+        Priority => 'notice',
+        Message =>
+            "OAuth2AuthSync: User synced UserID=$UserID Email=$Email",
+    );
 
-    #
-    # Read Groups from Header or JWT
-    #
     my @EntraGroups;
 
     if ( $ENV{HTTP_X_REMOTE_GROUPS} ) {
@@ -195,11 +259,13 @@ sub Sync {
         $LogObject->Log(
             Priority => 'notice',
             Message =>
-                "OAuth2AuthSync: Groups Header <$ENV{HTTP_X_REMOTE_GROUPS}>",
+                "OAuth2AuthSync: Header groups="
+                . join( ',', @EntraGroups ),
         );
     }
     elsif (
         $Claims
+        && $Claims->{groups}
         && ref $Claims->{groups} eq 'ARRAY'
         )
     {
@@ -209,50 +275,27 @@ sub Sync {
         $LogObject->Log(
             Priority => 'notice',
             Message =>
-                "OAuth2AuthSync: Using groups from JWT",
+                "OAuth2AuthSync: JWT groups="
+                . join( ',', @EntraGroups ),
         );
     }
 
-    if (!@EntraGroups) {
-
-        $LogObject->Log(
-            Priority => 'notice',
-            Message =>
-                "OAuth2AuthSync: No Entra groups received",
-        );
-
-        return 1;
-    }
+    my $GroupMapping =
+        $ConfigObject->Get('OAuth2AuthSync::GroupMapping') || {};
 
     GROUP:
     for my $EntraGroup (@EntraGroups) {
 
         my $Mapped = $GroupMapping->{$EntraGroup};
 
-        $LogObject->Log(
-            Priority => 'notice',
-            Message =>
-                "OAuth2AuthSync: EntraGroup <$EntraGroup>",
-        );
-
         next GROUP if !$Mapped;
 
-        my @ZnunyGroups;
-
-        if ( ref $Mapped eq 'ARRAY' ) {
-            @ZnunyGroups = @{$Mapped};
-        }
-        else {
-            @ZnunyGroups = ($Mapped);
-        }
+        my @ZnunyGroups =
+            ref $Mapped eq 'ARRAY'
+            ? @{$Mapped}
+            : ($Mapped);
 
         for my $ZnunyGroup (@ZnunyGroups) {
-
-            $LogObject->Log(
-                Priority => 'notice',
-                Message =>
-                    "OAuth2AuthSync: Mapping <$EntraGroup> -> <$ZnunyGroup>",
-            );
 
             my $GroupID = $GroupObject->GroupLookup(
                 Group => $ZnunyGroup,
@@ -263,34 +306,25 @@ sub Sync {
                 $LogObject->Log(
                     Priority => 'error',
                     Message =>
-                        "OAuth2AuthSync: GroupLookup failed for <$ZnunyGroup>",
+                        "OAuth2AuthSync: Group <$ZnunyGroup> not found",
                 );
 
                 next;
             }
 
-            $LogObject->Log(
-                Priority => 'notice',
-                Message =>
-                    "OAuth2AuthSync: Found GroupID <$GroupID>",
+            my $Success = $Self->_GroupAdd(
+                UserID  => $UserID,
+                GroupID => $GroupID,
             );
 
-            my $Success =
-                $GroupObject->PermissionGroupUserAdd(
-                    UID           => $UserID,
-                    GID           => $GroupID,
-                    PermissionKey => 'rw',
-                    UserID        => 1,
-                );
-
             $LogObject->Log(
                 Priority => 'notice',
                 Message =>
-                    "OAuth2AuthSync: PermissionGroupUserAdd "
-                  . "UID=$UserID "
-                  . "GID=$GroupID "
-                  . "RESULT="
-                  . ( defined $Success ? $Success : 'undef' ),
+                    "OAuth2AuthSync: Added UserID=$UserID "
+                  . "to Group=$ZnunyGroup "
+                  . "(ID=$GroupID) "
+                  . "Result="
+                  . ( $Success // 'already-exists' ),
             );
         }
     }
