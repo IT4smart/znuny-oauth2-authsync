@@ -284,6 +284,11 @@ sub Sync {
         );
     }
 
+    $Self->_Debug(
+        "EntraGroups="
+        . join(',', @EntraGroups)
+    );
+
     my $GroupMapping =
         $ConfigObject->Get('OAuth2AuthSync::GroupMapping') || {};
 
