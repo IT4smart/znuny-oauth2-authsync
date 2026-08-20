@@ -219,7 +219,11 @@ sub Sync {
             UserLastname  => $LastName  || 'User',
             UserEmail     => $Email,
             ValidID       => 1,
-            UserID        => 1,
+            ChangeUserID        => 1,
+        );
+
+        $UserID = $UserObject->UserLookup(
+            UserLogin => $UserLogin,
         );
 
         if (!$UserID) {
@@ -311,6 +315,13 @@ sub Sync {
 
                 next;
             }
+
+            $LogObject->Log(
+                Priority => 'notice',
+                Message =>
+                    "OAuth2AuthSync: Inserting group relation "
+                    ."UserID=$UserID GroupID=$GroupID",
+            );
 
             my $Success = $Self->_GroupAdd(
                 UserID  => $UserID,
