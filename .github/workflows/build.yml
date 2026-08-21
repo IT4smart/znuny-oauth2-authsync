@@ -45,14 +45,18 @@ jobs:
           mkdir /opt/znuny/Kernel/System/AuthSync
           cp ${GITHUB_WORKSPACE}/Kernel/System/AuthSync/OAuth2AuthSync.pm /opt/znuny/Kernel/System/AuthSync/OAuth2AuthSync.pm
           cp ${GITHUB_WORKSPACE}/Kernel/Config/Files/XML/OAuth2AuthSync.xml /opt/znuny/Kernel/Config/Files/XML/OAuth2AuthSync.xml
+          cp -R ${GITHUB_WORKSPACE}/scripts/test/OAuth2AuthSync/ /opt/znuny/scripts/test/OAuth2AuthSync/
 
       - name: Run Unit Tests
         run: |
-          su -c "/opt/znuny/bin/znuny.Console.pl Dev::UnitTest::Run --directory ${GITHUB_WORKSPACE}/scripts/test/OAuth2AuthSync" -s /bin/bash znuny
+          ls -l /opt/znuny/scripts/test/OAuth2AuthSync/
+          su -c "/opt/znuny/bin/znuny.Console.pl Dev::UnitTest::Run --test OAuth2AuthSync" -s /bin/bash znuny
 
   build:
 
-    needs: lint
+    needs:
+      - lint
+      - test
 
     runs-on: ubuntu-latest
     container:
