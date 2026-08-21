@@ -31,6 +31,25 @@ jobs:
             perl -c "$FILE"
           done
 
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/znuny/znuny-docker/znuny-base:7.3.5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare Znuny
+        run: |
+          cd /opt/znuny
+          cp Kernel/Config.pm.dist Kernel/Config.pm
+          mkdir /opt/znuny/Kernel/System/AuthSync
+          cp ${GITHUB_WORKSPACE}/Kernel/System/AuthSync/OAuth2AuthSync.pm /opt/znuny/Kernel/System/AuthSync/OAuth2AuthSync.pm
+          cp ${GITHUB_WORKSPACE}/Kernel/Config/Files/XML/OAuth2AuthSync.xml /opt/znuny/Kernel/Config/Files/XML/OAuth2AuthSync.xml
+
+      - name: Run Unit Tests
+        run: |
+          su -c "/opt/znuny/bin/znuny.Console.pl Dev::UnitTest::Run --directory ${GITHUB_WORKSPACE}/scripts/test/OAuth2AuthSync" -s /bin/bash znuny
+
   build:
 
     needs: lint
