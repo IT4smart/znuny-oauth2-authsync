@@ -50,7 +50,7 @@ jobs:
       - name: Run Unit Tests
         run: |
           ls -l /opt/znuny/scripts/test/OAuth2AuthSync/
-          su -c "/opt/znuny/bin/znuny.Console.pl Dev::UnitTest::Run --test OAuth2AuthSync" -s /bin/bash znuny
+          su -c "/opt/znuny/bin/znuny.Console.pl Dev::UnitTest::Run --test OAuth2AuthSync --test AccessToken" -s /bin/bash znuny
 
   build:
 
