@@ -47,10 +47,26 @@ jobs:
           cp ${GITHUB_WORKSPACE}/Kernel/Config/Files/XML/OAuth2AuthSync.xml /opt/znuny/Kernel/Config/Files/XML/OAuth2AuthSync.xml
           cp -R ${GITHUB_WORKSPACE}/scripts/test/OAuth2AuthSync/ /opt/znuny/scripts/test/OAuth2AuthSync/
 
-      - name: Run Unit Tests
+      - name: Run Unit Tests - AccessToken
         run: |
-          ls -l /opt/znuny/scripts/test/OAuth2AuthSync/
           su -c "/opt/znuny/bin/znuny.Console.pl Dev::UnitTest::Run --test OAuth2AuthSync --test AccessToken" -s /bin/bash znuny
+      
+      - name: Run Unit Tests - GroupMapping
+        run: |
+          su -c "/opt/znuny/bin/znuny.Console.pl Dev::UnitTest::Run --test OAuth2AuthSync --test GroupMapping" -s /bin/bash znuny
+        
+      - name: Run Unit Tests - Install
+        run: |
+          su -c "/opt/znuny/bin/znuny.Console.pl Dev::UnitTest::Run --test OAuth2AuthSync --test Install" -s /bin/bash znuny
+
+      - name: Run Unit Tests - LoginPriority
+        run: |
+          su -c "/opt/znuny/bin/znuny.Console.pl Dev::UnitTest::Run --test OAuth2AuthSync --test LoginPriority" -s /bin/bash znuny
+ 
+      - name: Run Unit Tests - ProtectedUsers
+        run: |
+          su -c "/opt/znuny/bin/znuny.Console.pl Dev::UnitTest::Run --test OAuth2AuthSync --test ProtectedUsers" -s /bin/bash znuny
+ 
 
   build:
 
