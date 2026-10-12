@@ -87,7 +87,7 @@ jobs:
           cp ${GITHUB_WORKSPACE}/Kernel/Config/Files/XML/OAuth2AuthSync.xml /opt/znuny/Kernel/Config/Files/XML/OAuth2AuthSync.xml
           su -c "/opt/znuny/bin/znuny.Console.pl Dev::Package::Build ${GITHUB_WORKSPACE}/OAuth2AuthSync.sopm /tmp" -s /bin/bash znuny
 
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: OAuth2AuthSync
           path: /tmp/*.opm
